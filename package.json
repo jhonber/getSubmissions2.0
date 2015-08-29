@@ -1,0 +1,20 @@
+{
+  "name": "getSubmissions2.0",
+  "version": "1.0.0",
+  "description": "Get submissions from Codeforces",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "codeforces",
+    "programming",
+    "contest"
+  ],
+  "author": "Jhon Jimenez",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^0.19.0",
+    "request": "^2.61.0"
+  }
+}

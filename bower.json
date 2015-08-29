@@ -1,0 +1,21 @@
+{
+  "name": "getSubmissions2.0",
+  "version": "0.0.0",
+  "authors": [
+    "Jhon Jimenez <jhonb3r@gmail.com>"
+  ],
+  "description": "Get submissions from Codeforces",
+  "keywords": [
+    "codeforces",
+    "programming",
+    "contest"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
