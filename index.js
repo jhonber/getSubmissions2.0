@@ -1,16 +1,26 @@
 var request = require('request');
 var cheerio = require('cheerio');
-var fs = require('fs');
-var mkdirp = require('mkdirp');
+var fs      = require('fs');
+var mkdirp  = require('mkdirp');
+var async   = require('async');
+
 
 var handle = process.argv[2];
 var subIds = [];
-var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=1';
-var ext = {'GNU C++': 'cpp', 'GNU C++11': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
+var directory = './codes';
+var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=6';
+var extension = {'GNU C++': 'cpp', 'GNU C++11': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
   'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js'};
 var comment = {'GNU C++': '//', 'GNU C++11': '//', 'GNU C': '//' ,'Java': '//', 'Haskell': '--',
   'Pascal': '//', 'Perl': '#', 'PHP': '//', 'Python': '#', 'Ruby': '#', 'JavaScript': '//'};
 
+
+
+if (!fs.exists(directory)) {
+  mkdirp(directory, function (err) {
+    if (err) console.error(err)
+  });
+}
 
 request.get(url, function (err, res, body) {
   if (err) console.log(err);
@@ -24,18 +34,21 @@ request.get(url, function (err, res, body) {
         var index = res.problem.index;
         var lang = res.programmingLanguage;
         var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
+        var ext = extension[lang];
 
         if (res.verdict == 'OK') {
-          subIds.push( {subId: res.id, contestId: contestId, index: index, lang: lang, urlProblemStat: urlProblemStat} );
+          subIds.push( {subId: res.id, contestId: contestId, index: index,
+                      lang: lang, urlProblemStat: urlProblemStat, ext: ext} );
         }
       }
 
-      for (var i = 0; i < subIds.length; ++i) {
-        var subId = subIds[i].subId;
-        var contestId = subIds[i].contestId;
-        var problemName = subIds[i].index;
-        var urlProblemStat = subIds[i].urlProblemStat;
-        var lang = subIds[i].lang;
+      async.each(subIds, function (item, callback) {
+        var subId = item.subId;
+        var contestId = item.contestId;
+        var problemName = item.index;
+        var urlProblemStat = item.urlProblemStat;
+        var lang = item.lang;
+        var ext = item.ext;
 
         getSourceCode(subId, contestId, function(err, sourceCode) {
           if (err) console.log(err);
@@ -43,15 +56,24 @@ request.get(url, function (err, res, body) {
             getContestName(contestId, function (err, contestName) {
               if (err) console.log(err);
               else {
-                sourceCode = comment[lang] + ' ' + urlProblemStat + '\n' + sourceCode;
-                console.log(contestName);
-                console.log(problemName);
-                console.log(sourceCode);
+                sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
+                sourceCode = comment[lang] + ' ' + urlProblemStat + '\n\n' + sourceCode;
+                var name = problemName + '.' + ext;
+                var contestDir = directory + '/' + contestName;
+                var path = contestDir + '/' + name;
+
+                if (!fs.exists(contestDir)) {
+                  mkdirp(contestDir, function (err) {
+                    if (err) console.error(err)
+                    else writeFile(path, sourceCode);
+                  });
+                }
+                else writeFile(path, sourceCode);
               }
             });
           }
-        })
-      }
+        });
+      });
     }
     else {
       console.log('Usage: node index.js <handle>');
@@ -87,8 +109,8 @@ function getContestName (contestId, callback) {
   });
 }
 
-function writeFile (path, fileName, ext, sourceCode) {
-  fs.writeFile(path + '/' + fileName + '.' + ext, sourceCode, function (err) {
+function writeFile (name, sourceCode) {
+  fs.writeFile(name, sourceCode, function (err) {
     if (err) throw err;
   });
 }
