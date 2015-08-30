@@ -8,10 +8,11 @@ var async   = require('async');
 var handle = process.argv[2];
 var subIds = [];
 var directory = './codes';
-var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=6';
-var extension = {'GNU C++': 'cpp', 'GNU C++11': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
+var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=1';
+var extension = {'GNU C++': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
   'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js'};
-var comment = {'GNU C++': '//', 'GNU C++11': '//', 'GNU C': '//' ,'Java': '//', 'Haskell': '--',
+
+var comment = {'GNU C++': '//','GNU C': '//' ,'Java': '//', 'Haskell': '--',
   'Pascal': '//', 'Perl': '#', 'PHP': '//', 'Python': '#', 'Ruby': '#', 'JavaScript': '//'};
 
 
@@ -34,7 +35,7 @@ request.get(url, function (err, res, body) {
         var index = res.problem.index;
         var lang = res.programmingLanguage;
         var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
-        var ext = extension[lang];
+        var ext = getExtension(lang);
 
         if (res.verdict == 'OK') {
           subIds.push( {subId: res.id, contestId: contestId, index: index,
@@ -57,8 +58,13 @@ request.get(url, function (err, res, body) {
               if (err) console.log(err);
               else {
                 sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
-                sourceCode = comment[lang] + ' ' + urlProblemStat + '\n\n' + sourceCode;
-                var name = problemName + '.' + ext;
+                var comm = getComment(lang);
+                if (comm) sourceCode = comm + ' ' + urlProblemStat + '\n\n' + sourceCode;
+
+                var name;
+                if (ext) name = problemName + '.' + ext;
+                else name = problemName;
+
                 var contestDir = directory + '/' + contestName;
                 var path = contestDir + '/' + name;
 
@@ -113,4 +119,22 @@ function writeFile (name, sourceCode) {
   fs.writeFile(name, sourceCode, function (err) {
     if (err) throw err;
   });
+}
+
+function getExtension (lang) {
+  for (var key in extension) {
+    if (extension.hasOwnProperty(key) && typeof lang.indexOf &&
+        lang.indexOf(key) != -1) {
+      return extension[key];
+    }
+  }
+}
+
+function getComment (lang) {
+  for (var key in comment) {
+    if (comment.hasOwnProperty(key) && typeof lang.indexOf &&
+        lang.indexOf(key) != -1) {
+      return comment[key];
+    }
+  }
 }
