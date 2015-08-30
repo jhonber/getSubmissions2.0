@@ -6,7 +6,8 @@ var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&co
 var subIds = [];
 
 request.get(url, function (err, res, body) {
-  if (handle) {
+  if (err) console.log(err);
+  else if (handle) {
     var data = JSON.parse(body);
     if (data.status == 'OK') {
       var result = data.result;
@@ -21,10 +22,15 @@ request.get(url, function (err, res, body) {
         var contestId = subIds[i].contestId
         getSourceCode(subId, contestId, function(err, source) {
           if (err) console.log(err);
-          getContestName(contestId, function (err, contestName){
-            console.log(contestName);
-            console.log(source);
-          });
+          else {
+            getContestName(contestId, function (err, contestName) {
+              if (err) console.log(err);
+              else {
+                console.log(contestName);
+                console.log(source);
+              }
+            });
+          }
         })
       }
     }
