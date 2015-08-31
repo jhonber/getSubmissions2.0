@@ -22,7 +22,9 @@ var comment = {'GNU C++': '//','GNU C': '//' ,'Java': '//', 'Haskell': '--',
 
 
 if (!handle) {
-  console.log('\nUsage: node index.js <handle> <count>\n');
+  var pname = process.argv[1].split('/');
+  pname = pname[pname.length - 1];
+  console.log('\nUsage: ' + process.argv[0] + ' ' + pname + ' <handle> <count>\n');
   console.log('<handle>: Validad handle from codeforces.com');
   console.log('<count>: Searching for Accepted in the last N submissions, "infinite" by default\n');
   process.exit(1);
