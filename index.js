@@ -5,10 +5,14 @@ var mkdirp  = require('mkdirp');
 var async   = require('async');
 
 
+var inf = 1000000;
 var handle = process.argv[2];
+var count  = process.argv[3] || inf;
+var dbPath = './data.db';
+var db = {};
 var subIds = [];
 var directory = './codes';
-var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=1';
+var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=' + count;
 var extension = {'GNU C++': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
   'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js'};
 
@@ -17,7 +21,27 @@ var comment = {'GNU C++': '//','GNU C': '//' ,'Java': '//', 'Haskell': '--',
 
 
 
-if (!fs.exists(directory)) {
+
+if (!handle) {
+  console.log('\nUsage: node index.js <handle> <count>\n');
+  console.log('<handle>: Validad handle from codeforces.com');
+  console.log('<count>: Searching for Accepted in the last N submissions, "infinite" by default\n');
+  process.exit(1);
+}
+
+
+if (!fs.existsSync(dbPath)) {
+  fs.writeFile(dbPath, '', function (err) {
+    if (err) throw err;
+    else {
+      console.log('Created DataBase!', dbPath);
+    }
+  });
+}
+else loadDB();
+
+
+if (!fs.existsSync(directory)) {
   mkdirp(directory, function (err) {
     if (err) console.error(err)
   });
@@ -25,7 +49,7 @@ if (!fs.exists(directory)) {
 
 request.get(url, function (err, res, body) {
   if (err) console.log(err);
-  else if (handle) {
+  else {
     var data = JSON.parse(body);
     if (data.status == 'OK') {
       var result = data.result;
@@ -51,51 +75,61 @@ request.get(url, function (err, res, body) {
         var lang = item.lang;
         var ext = item.ext;
 
-        getSourceCode(subId, contestId, function(err, sourceCode) {
-          if (err) console.log(err);
-          else {
-            getContestName(contestId, function (err, contestName) {
-              if (err) console.log(err);
-              else {
-                sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
-                var comm = getComment(lang);
-                if (comm) sourceCode = comm + ' ' + urlProblemStat + '\n\n' + sourceCode;
+        if (db[subId]) {
+          console.log('Already downloaded: ', subId);
+        }
+        else {
+          getSourceCode(subId, contestId, function(err, sourceCode) {
+            if (err) console.log(err);
+            else {
+              getContestName(contestId, function (err, contestName) {
+                if (err) console.log(err);
+                else {
+                  sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
+                  var comm = getComment(lang);
+                  if (comm) sourceCode = comm + ' ' + urlProblemStat + '\n\n' + sourceCode;
 
-                var name;
-                if (ext) name = problemName + '.' + ext;
-                else name = problemName;
+                  var name;
+                  if (ext) name = problemName + '.' + ext;
+                  else name = problemName;
 
-                var contestDir = directory + '/' + contestName;
-                var path = contestDir + '/' + name;
+                  var contestDir = directory + '/' + contestName;
+                  var path = contestDir + '/' + name;
 
-                if (!fs.exists(contestDir)) {
-                  mkdirp(contestDir, function (err) {
-                    if (err) console.error(err)
-                    else writeFile(path, sourceCode);
-                  });
+                  if (!fs.existsSync(contestDir)) {
+                    mkdirp(contestDir, function (err) {
+                      if (err) console.error(err)
+                        else {
+                          fs.writeFile(path, sourceCode, function (err) {
+                            if (err) throw err;
+                            else {
+                              saveInDB(subId);
+                            }
+                          });
+                        }
+                    });
+                  }
+                  else {
+                    fs.writeFile(path, sourceCode, function (err) {
+                      if (err) throw err;
+                      else {
+                        saveInDB(subId);
+                      }
+                    });
+                  }
                 }
-                else writeFile(path, sourceCode);
-              }
-            });
-          }
-        });
+              });
+            }
+          });
+        }
       });
     }
-    else {
-      console.log('Usage: node index.js <handle>');
-      process.exit(1);
-    }
   }
-  else {
-    console.log('Request error: ', data.status);
-    process.exit(2);
-  }
-})
+});
 
 
 function getSourceCode (subId, contestId, callback) {
   var url = 'http://codeforces.com/contest/'+ contestId + '/submission/' + subId;
-  console.log(url);
   request.get(url, function (err, res, body) {
     var $ = cheerio.load(body);
     var sourceCode = $('.program-source')[0].children[0].data;
@@ -115,12 +149,6 @@ function getContestName (contestId, callback) {
   });
 }
 
-function writeFile (name, sourceCode) {
-  fs.writeFile(name, sourceCode, function (err) {
-    if (err) throw err;
-  });
-}
-
 function getExtension (lang) {
   for (var key in extension) {
     if (extension.hasOwnProperty(key) && typeof lang.indexOf &&
@@ -137,4 +165,20 @@ function getComment (lang) {
       return comment[key];
     }
   }
+}
+
+function loadDB () {
+  var data = fs.readFileSync(dbPath);
+  var d = data.toString().split('\n');
+  for (var i = 0; i < d.length; ++i) {
+    var n = Number(d[i]);
+    if (!isNaN(d[i])) db[n] = true;
+  }
+  console.log('Loaded data base!');
+}
+
+function saveInDB (sub) {
+  fs.appendFile(dbPath, '\n' + sub, function (err) {
+    if (err) throw err;
+  });
 }
