@@ -7,6 +7,7 @@ var progBar = require('progress');
 
 
 var inf = 1000000;
+var maxContestId = 100000;
 var cnt = 0;
 var handle = process.argv[2];
 var count  = process.argv[3] || inf;
@@ -67,6 +68,7 @@ request.get(url, function (err, res, body) {
           console.log('No new submissions!')
           process.exit(0);
         }
+
         console.log('Total submissions to download: ', tot);
         var bar = new progBar('  downloading [:bar] :percent :etas', {
           complete: '#',
@@ -82,61 +84,68 @@ request.get(url, function (err, res, body) {
           var urlProblemStat = item.urlProblemStat;
           var lang = item.lang;
           var ext = item.ext;
+          var isGym = item.isGym;
 
 
-
-          getSourceCode(subId, contestId, function(err, sourceCode) {
-            if (err) {
-              bar.tick();
-              failed.push(urlProblemStat);
-              if (bar.complete) afterComplete(cnt, tot);
-            }
-            else {
-              getContestName(contestId, function (err, contestName) {
-                if (err) console.log('Error on getContestName: ' + err);
-                else {
-                  sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
-                  var comm = getComment(lang);
-                  if (comm) sourceCode = comm + ' ' + urlProblemStat + '\n\n' + sourceCode;
-
-                  var name;
-                  if (ext) name = problemName + '.' + ext;
-                  else name = problemName;
-
-                  var contestDir = directory + '/' + contestName;
-                  var path = contestDir + '/' + name;
-
-                  if (!fs.existsSync(contestDir)) {
-                    mkdirp(contestDir, function (err) {
-                      if (err) console.error(err)
-                        else {
-                          fs.writeFile(path, sourceCode, function (err) {
-                            if (err) throw err;
-                            else {
-                              cnt ++;
-                              saveInDB(subId);
-                              bar.tick();
-                              if (bar.complete) afterComplete(cnt, tot);
-                            }
-                          });
-                        }
-                    });
-                  }
+          if (!isGym) {
+            getSourceCode(subId, contestId, function(err, sourceCode) {
+              if (err) {
+                bar.tick();
+                failed.push(urlProblemStat);
+                if (bar.complete) afterComplete(cnt, tot);
+              }
+              else {
+                getContestName(contestId, function (err, contestName) {
+                  if (err) console.log('Error on getContestName: ' + err);
                   else {
-                    fs.writeFile(path, sourceCode, function (err) {
-                      if (err) throw err;
-                      else {
-                        cnt ++;
-                        saveInDB(subId);
-                        bar.tick();
-                        if (bar.complete) afterComplete(cnt, tot);
-                      }
-                    });
+                    sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
+                    var comm = getComment(lang);
+                    if (comm) sourceCode = comm + ' ' + urlProblemStat + '\n\n' + sourceCode;
+
+                    var name;
+                    if (ext) name = problemName + '.' + ext;
+                    else name = problemName;
+
+                    var contestDir = directory + '/' + contestName;
+                    var path = contestDir + '/' + name;
+
+                    if (!fs.existsSync(contestDir)) {
+                      mkdirp(contestDir, function (err) {
+                        if (err) console.error(err)
+                          else {
+                            fs.writeFile(path, sourceCode, function (err) {
+                              if (err) throw err;
+                              else {
+                                cnt ++;
+                                saveInDB(subId);
+                                bar.tick();
+                                if (bar.complete) afterComplete(cnt, tot);
+                              }
+                            });
+                          }
+                      });
+                    }
+                    else {
+                      fs.writeFile(path, sourceCode, function (err) {
+                        if (err) throw err;
+                        else {
+                          cnt ++;
+                          saveInDB(subId);
+                          bar.tick();
+                          if (bar.complete) afterComplete(cnt, tot);
+                        }
+                      });
+                    }
                   }
-                }
-              });
-            }
-          });
+                });
+              }
+            });
+          }
+          else {
+            bar.tick();
+            failed.push(urlProblemStat);
+            if (bar.complete) afterComplete(cnt, tot);
+          }
         });
       });
     }
@@ -154,11 +163,17 @@ function getLastSubIds (data, callback) {
     var lang = res.programmingLanguage;
     var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
     var ext = getExtension(lang);
+    var isGym = false;
+
+    if (contestId > maxContestId) {
+      urlProblemStat = 'http://codeforces.com/gym/' + contestId + '/problem/' + index;
+      isGym = true;
+    }
 
     if (res.verdict == 'OK') {
       if (!db[res.id]) {
         subIds.push( {subId: res.id, contestId: contestId, index: index,
-                    lang: lang, urlProblemStat: urlProblemStat, ext: ext} );
+                    lang: lang, urlProblemStat: urlProblemStat, ext: ext, isGym: isGym} );
       }
     }
   });
