@@ -10,6 +10,7 @@ var inf = 1000000;
 var cnt = 0;
 var handle = process.argv[2];
 var count  = process.argv[3] || inf;
+var failed = [];
 var dbPath = './data.db';
 var db = {};
 var directory = './codes';
@@ -50,8 +51,10 @@ if (!fs.existsSync(directory)) {
   });
 }
 
+
+setTimeout(function() {console.log('Waiting for response of Codeforces ...')}, 1000);
 request.get(url, function (err, res, body) {
-  if (err) console.log(err);
+  if (err) console.log('Error to get ' + url, err);
   else {
     var data = JSON.parse(body);
     if (data.status == 'OK') {
@@ -64,7 +67,7 @@ request.get(url, function (err, res, body) {
           console.log('No new submissions!')
           process.exit(0);
         }
-
+        console.log('Total submissions to download: ', tot);
         var bar = new progBar('  downloading [:bar] :percent :etas', {
           complete: '#',
           incomplete: '.',
@@ -80,10 +83,13 @@ request.get(url, function (err, res, body) {
           var lang = item.lang;
           var ext = item.ext;
 
+
+
           getSourceCode(subId, contestId, function(err, sourceCode) {
             if (err) {
-              console.log(err);
-              console.log('Impossible to get submission "' + subId + '", maybe belongs to Gym contest.\n');
+              bar.tick();
+              failed.push(urlProblemStat);
+              if (bar.complete) afterComplete(cnt, tot);
             }
             else {
               getContestName(contestId, function (err, contestName) {
@@ -109,7 +115,8 @@ request.get(url, function (err, res, body) {
                             else {
                               cnt ++;
                               saveInDB(subId);
-                              bar.tick(cnt);
+                              bar.tick();
+                              if (bar.complete) afterComplete(cnt, tot);
                             }
                           });
                         }
@@ -121,7 +128,8 @@ request.get(url, function (err, res, body) {
                       else {
                         cnt ++;
                         saveInDB(subId);
-                        bar.tick(cnt);
+                        bar.tick();
+                        if (bar.complete) afterComplete(cnt, tot);
                       }
                     });
                   }
@@ -137,6 +145,8 @@ request.get(url, function (err, res, body) {
 
 function getLastSubIds (data, callback) {
   var subIds = [];
+  console.log('Searching for Accepted codes ...');
+
   async.each(data, function (item, callback) {
     var res = item;
     var contestId = res.contestId;
@@ -214,4 +224,14 @@ function saveInDB (sub) {
   fs.appendFile(dbPath, '\n' + sub, function (err) {
     if (err) throw err;
   });
+}
+
+function afterComplete (cnt, tot) {
+  console.log('Downloaded ', cnt, 'of', tot, 'submissions');
+  if (cnt < tot) {
+    console.log('\nFailed to download ' + failed.length + ' submissions.\n');
+    console.log('Maybe belongs to Gym contest or authentication is required.\n');
+
+    for (var i = 0; i < failed.length; ++i) console.log(failed[i]);
+  }
 }
