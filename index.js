@@ -10,7 +10,6 @@ var handle = process.argv[2];
 var count  = process.argv[3] || inf;
 var dbPath = './data.db';
 var db = {};
-var subIds = [];
 var directory = './codes';
 var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=' + count;
 var extension = {'GNU C++': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
@@ -53,34 +52,22 @@ request.get(url, function (err, res, body) {
     var data = JSON.parse(body);
     if (data.status == 'OK') {
       var result = data.result;
-      for (var i = 0; i < result.length; ++i) {
-        var res = result[i];
-        var contestId = res.contestId;
-        var index = res.problem.index;
-        var lang = res.programmingLanguage;
-        var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
-        var ext = getExtension(lang);
 
-        if (res.verdict == 'OK') {
-          subIds.push( {subId: res.id, contestId: contestId, index: index,
-                      lang: lang, urlProblemStat: urlProblemStat, ext: ext} );
-        }
-      }
+      getLastSubIds(result, function (err, subIds) {
 
-      async.each(subIds, function (item, callback) {
-        var subId = item.subId;
-        var contestId = item.contestId;
-        var problemName = item.index;
-        var urlProblemStat = item.urlProblemStat;
-        var lang = item.lang;
-        var ext = item.ext;
+        async.each(subIds, function (item, callback) {
+          var subId = item.subId;
+          var contestId = item.contestId;
+          var problemName = item.index;
+          var urlProblemStat = item.urlProblemStat;
+          var lang = item.lang;
+          var ext = item.ext;
 
-        if (db[subId]) {
-          console.log('Already downloaded: ', subId);
-        }
-        else {
           getSourceCode(subId, contestId, function(err, sourceCode) {
-            if (err) console.log(err);
+            if (err) {
+              console.log(err);
+              console.log('Impossible to get submission "' + subId + '", maybe belongs to Gym contest.\n');
+            }
             else {
               getContestName(contestId, function (err, contestName) {
                 if (err) console.log(err);
@@ -121,19 +108,45 @@ request.get(url, function (err, res, body) {
               });
             }
           });
-        }
+        });
       });
     }
   }
 });
 
+function getLastSubIds (data, callback) {
+  var subIds = [];
+  async.each(data, function (item, callback) {
+    var res = item;
+    var contestId = res.contestId;
+    var index = res.problem.index;
+    var lang = res.programmingLanguage;
+    var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
+    var ext = getExtension(lang);
+
+    if (res.verdict == 'OK') {
+      if (db[res.id]) console.log('Already downloaded: ', res.id);
+      else {
+        subIds.push( {subId: res.id, contestId: contestId, index: index,
+                    lang: lang, urlProblemStat: urlProblemStat, ext: ext} );
+      }
+    }
+  });
+
+  callback(null, subIds);
+}
 
 function getSourceCode (subId, contestId, callback) {
   var url = 'http://codeforces.com/contest/'+ contestId + '/submission/' + subId;
   request.get(url, function (err, res, body) {
-    var $ = cheerio.load(body);
-    var sourceCode = $('.program-source')[0].children[0].data;
-    callback(null, sourceCode);
+    try {
+      var $ = cheerio.load(body);
+      var sourceCode = $('.program-source')[0].children[0].data;
+      callback(null, sourceCode);
+    }
+    catch (err) {
+      callback(err);
+    }
   });
 }
 
