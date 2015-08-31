@@ -3,9 +3,11 @@ var cheerio = require('cheerio');
 var fs      = require('fs');
 var mkdirp  = require('mkdirp');
 var async   = require('async');
+var progBar = require('progress');
 
 
 var inf = 1000000;
+var cnt = 0;
 var handle = process.argv[2];
 var count  = process.argv[3] || inf;
 var dbPath = './data.db';
@@ -25,7 +27,7 @@ if (!handle) {
   var pname = process.argv[1].split('/');
   pname = pname[pname.length - 1];
   console.log('\nUsage: ' + process.argv[0] + ' ' + pname + ' <handle> <count>\n');
-  console.log('<handle>: Validad handle from codeforces.com');
+  console.log('<handle>: Valid handle from codeforces.com');
   console.log('<count>: Searching for Accepted in the last N submissions, "infinite" by default\n');
   process.exit(1);
 }
@@ -35,7 +37,7 @@ if (!fs.existsSync(dbPath)) {
   fs.writeFile(dbPath, '', function (err) {
     if (err) throw err;
     else {
-      console.log('Created DataBase!', dbPath);
+      console.log('Created data base!', dbPath);
     }
   });
 }
@@ -56,6 +58,19 @@ request.get(url, function (err, res, body) {
       var result = data.result;
 
       getLastSubIds(result, function (err, subIds) {
+        var tot = subIds.length;
+
+        if (tot == 0) {
+          console.log('No new submissions!')
+          process.exit(0);
+        }
+
+        var bar = new progBar('  downloading [:bar] :percent :etas', {
+          complete: '#',
+          incomplete: '.',
+          width: 20,
+          total: tot
+        });
 
         async.each(subIds, function (item, callback) {
           var subId = item.subId;
@@ -72,7 +87,7 @@ request.get(url, function (err, res, body) {
             }
             else {
               getContestName(contestId, function (err, contestName) {
-                if (err) console.log(err);
+                if (err) console.log('Error on getContestName: ' + err);
                 else {
                   sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
                   var comm = getComment(lang);
@@ -92,7 +107,9 @@ request.get(url, function (err, res, body) {
                           fs.writeFile(path, sourceCode, function (err) {
                             if (err) throw err;
                             else {
+                              cnt ++;
                               saveInDB(subId);
+                              bar.tick(cnt);
                             }
                           });
                         }
@@ -102,7 +119,9 @@ request.get(url, function (err, res, body) {
                     fs.writeFile(path, sourceCode, function (err) {
                       if (err) throw err;
                       else {
+                        cnt ++;
                         saveInDB(subId);
+                        bar.tick(cnt);
                       }
                     });
                   }
@@ -127,8 +146,7 @@ function getLastSubIds (data, callback) {
     var ext = getExtension(lang);
 
     if (res.verdict == 'OK') {
-      if (db[res.id]) console.log('Already downloaded: ', res.id);
-      else {
+      if (!db[res.id]) {
         subIds.push( {subId: res.id, contestId: contestId, index: index,
                     lang: lang, urlProblemStat: urlProblemStat, ext: ext} );
       }
@@ -139,7 +157,7 @@ function getLastSubIds (data, callback) {
 }
 
 function getSourceCode (subId, contestId, callback) {
-  var url = 'http://codeforces.com/contest/'+ contestId + '/submission/' + subId;
+  var url = 'http://codeforces.com/contest/' + contestId + '/submission/' + subId;
   request.get(url, function (err, res, body) {
     try {
       var $ = cheerio.load(body);
@@ -160,7 +178,7 @@ function getContestName (contestId, callback) {
       var name = data.result.contest.name;
       callback(false, name);
     }
-    else callback(true);
+    else callback(err);
   });
 }
 
