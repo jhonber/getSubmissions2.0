@@ -245,7 +245,7 @@ function afterComplete (cnt, tot) {
   console.log('Downloaded ', cnt, 'of', tot, 'submissions');
   if (cnt < tot) {
     console.log('\nFailed to download ' + failed.length + ' submissions.\n');
-    console.log('Maybe belongs to Gym contest or authentication is required.\n');
+    console.log('Maybe they belong to Gym contest or authentication is required.\n');
 
     for (var i = 0; i < failed.length; ++i) console.log(failed[i]);
   }
