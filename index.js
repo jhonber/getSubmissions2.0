@@ -90,54 +90,60 @@ request.get(url, function (err, res, body) {
       console.log('API error ' + url, data.status);
     }
   }
-});
 
-request.get(url2, function (err, res, body) {
-  var data = body = JSON.parse(body);
-  if (data.status == 'OK') {
-    for (var i = 0; i < data.length; ++i) {
-      var name = data[i].result.contest.name;
-      var id = data[i].result.contest.id;
-      contestMap[id] = name;
+  request.get(url2, function (err, res, body) {
+    var data = body = JSON.parse(body);
+    if (data.status == 'OK') {
+      for (var i = 0; i < data.length; ++i) {
+        var name = data[i].result.contest.name;
+        var id = data[i].result.contest.id;
+        contestMap[id] = name;
+      }
     }
-  }
-  else {
-    console.log('API Error ' + url, data.status);
-  }
+    else {
+      console.log('API Error ' + url, data.status);
+    }
+
+    process.nextTick(function(){ getSourceCode(0) });
+    console.log(accepted.length);
+  });
+
 });
 
 
-function getSourceCode () {
-  for (var i = 0; i < accepted.length; ++i) {
-    if (accepted[i].isGym) continue;
-    var contestId = accepted[i].contestId;
-    var subId = accepted[i].subId;
-    var url = 'http://codeforces.com/contest/' + contestId + '/submission/' + subId;
-    request.get(url, function (err, res, body) {
-      try {
-        var $ = cheerio.load(body);
-        var sourceCode = $('.program-source')[0].children[0].data;
-        writeFile(accepted[i], sourceCode)
-      }
-      catch (err) {
-        console.log('Error on getSource: ', err);
-      }
-    });
-  }
+function getSourceCode (i) {
+    if (i > 10) return 0;
+    else {
+//  for (var i = 0; i < accepted.length; ++i) {
+    if (!accepted[i].isGym) {
+      var contestId = accepted[i].contestId;
+      var subId = accepted[i].subId;
+      var url = 'http://codeforces.com/contest/' + contestId + '/submission/' + subId;
+      console.log(url);
+      request.get(url, function (err, res, body) {
+        try {
+          var $ = cheerio.load(body);
+          var sourceCode = $('.program-source')[0].children[0].data;
+          writeFile(accepted[i], sourceCode)
+        }
+        catch (err) {
+          console.log('Error on getSource: ', err);
+        }
+      });
+    }
+//  }
+    getSourceCode(i + 1);
+    }
 }
 
-process.nextTick(function () {
-  getSourceCode();
-});
-
-
 function writeFile (sub, sourceCode) {
+  console.log(sub.contestId)
   sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
   var comm = getComment(sub.lang);
   if (comm) sourceCode = comm + ' ' + sub.urlProblemStat + '\n\n' + sourceCode;
 
   var name;
-  if (ext) name = sub.index + '.' + sub.ext;
+  if (sub.ext) name = sub.index + '.' + sub.ext;
   else name = sub.index;
 
   var contestDir = directory + '/' + contestMap[sub.contestId];
@@ -150,7 +156,7 @@ function writeFile (sub, sourceCode) {
           fs.writeFile(path, sourceCode, function (err) {
             if (err) throw err;
             else {
-              saveInDB(subId);
+              saveInDB(sub.subId);
             }
           });
         }
@@ -160,11 +166,10 @@ function writeFile (sub, sourceCode) {
     fs.writeFile(path, sourceCode, function (err) {
       if (err) throw err;
       else {
-        saveInDB(subId);
+        saveInDB(sub.subId);
       }
     });
   }
-
 }
 
 
