@@ -2,15 +2,15 @@ var request = require('request');
 var cheerio = require('cheerio');
 var fs      = require('fs');
 var mkdirp  = require('mkdirp');
+var async   = require('async');
 var progBar = require('progress');
-var async = require('async');
-
 
 var inf = 10000000;
 var maxContestId = 100000;
-var cnt = 0;
+var cnt = total = 0;
 var handle;
 var count = inf;
+var failed = [];
 var contestMap = {};
 var dbPath = './data.db';
 var directory = '.';
@@ -37,8 +37,6 @@ process.argv.forEach(function (v, i, arr) {
     if (directory[s] == '/') directory = directory.substr(0,s);
   }
 });
-
-
 
 
 if (!handle) {
@@ -76,36 +74,33 @@ request.get(url2, function (err, res, body) {
               var data = data.result;
 
               loadDB(function (err, db) {
-                if (err) console.log(err);
 
-                console.log('Downloading source codes ...');
-                async.each(data, function (cur, callback) {
-                  if (cur.verdict == 'OK') {
-                    var contestId = cur.contestId;
-                    var index = cur.problem.index;
-                    var lang = cur.programmingLanguage;
-                    var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
-                    var ext = getExtension(lang);
-                    var isGym = false;
+                selectSubToDownload (db, data, function (err, res) {
+                  var tot = res.length;
+                  total = tot;
+                  var bar = new progBar('  downloading [:bar] :percent :etas', {
+                    complete: '#',
+                    incomplete: '.',
+                    width: 20,
+                    total: tot
+                  });
 
-                    if (contestId > maxContestId) {
-                      urlProblemStat = 'http://codeforces.com/gym/' + contestId + '/problem/' + index;
-                      isGym = true;
-                    }
+                  console.log('Total accepted: ', tot);
+                  if (err) console.log(err);
 
-                    if (!db[cur.id]) {
-                      var sub = { subId: cur.id, contestId: contestId, index: index,
-                        lang: lang, urlProblemStat: urlProblemStat, ext: ext, isGym: isGym }
-
-                        process.nextTick(function(){ getSourceCode(sub) });
-                    }
-                  }
+                  console.log('Downloading source codes ...');
+                  async.each(res, function (cur, callback) {
+                    getSourceCode(cur, function (err) {
+                      cnt ++;
+                      bar.tick();
+                      if (bar.complete) afterComplete();
+                      callback();
+                    });
+                  });
                 });
               });
-          }
-          else {
-              console.log('API error ' + url, data.status);
             }
+            else console.log('API error ' + url, data.status);
           }
 
         });
@@ -117,6 +112,38 @@ request.get(url2, function (err, res, body) {
   }
 
 });
+
+
+function selectSubToDownload (db, data, callback) {
+  var res = [];
+  function go (i) {
+    if (i >= data.length) {
+      callback(null, res);
+    }
+    else {
+      var cur = data[i];
+      if (cur.verdict == 'OK' && !db[cur.id]) {
+        var contestId = cur.contestId;
+        var index = cur.problem.index;
+        var lang = cur.programmingLanguage;
+        var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
+        var ext = getExtension(lang);
+        var isGym = false;
+
+        if (contestId > maxContestId) {
+          urlProblemStat = 'http://codeforces.com/gym/' + contestId + '/problem/' + index;
+          isGym = true;
+        }
+
+        var sub = { subId: cur.id, contestId: contestId, index: index,
+                      lang: lang, urlProblemStat: urlProblemStat, ext: ext, isGym: isGym }
+        res.push(sub);
+      }
+      go (i + 1);
+    }
+  }
+  go (0);
+}
 
 
 function processContestNames (data, callback) {
@@ -135,7 +162,7 @@ function processContestNames (data, callback) {
 }
 
 
-function getSourceCode (sub) {
+function getSourceCode (sub, callback) {
   if (!sub.isGym) {
     var contestId = sub.contestId;
     var subId = sub.subId;
@@ -145,22 +172,25 @@ function getSourceCode (sub) {
       try {
         var $ = cheerio.load(body);
         var sourceCode = $('.program-source')[0].children[0].data;
-        writeFile(sub, sourceCode);
+        writeFile(sub, sourceCode, function (err) {
+          callback(null);
+        });
       }
       catch (err) {
-        console.log('This submission required authentication to download:');
-        console.log(url + '\n');
+        var s = 'This submission required authentication to download:\n' + url + '\n';
+        failed.push(s);
+        callback(true);
       }
     });
   }
   else {
-    console.log('This submission belongs to gym contest:');
-    console.log(sub.urlProblemStat + '\n');
+    var s = 'This submission belongs to gym contest:\n' + sub.urlProblemStat + '\n';
+    failed.push(s);
   }
 }
 
 
-function writeFile (sub, sourceCode) {
+function writeFile (sub, sourceCode, callback) {
   sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
   var comm = getComment(sub.lang);
   if (comm) sourceCode = comm + ' ' + sub.urlProblemStat + '\n\n' + sourceCode;
@@ -180,6 +210,7 @@ function writeFile (sub, sourceCode) {
             if (err) throw err;
             else {
               saveInDB(sub.subId);
+              callback(null);
             }
           });
         }
@@ -190,6 +221,7 @@ function writeFile (sub, sourceCode) {
       if (err) throw err;
       else {
         saveInDB(sub.subId);
+        callback(null);
       }
     });
   }
@@ -232,13 +264,13 @@ function loadDB (callback) {
     var d = data.toString().split('\n');
 
     function go (i) {
-      if (i >= data.length) {
+      if (i >= d.length) {
         console.log('Loaded data base!');
         callback(null, db);
       }
       else {
         var n = Number(d[i]);
-        if (!isNaN(n)) db[n] = true;
+        if (!isNaN(n) && n > 0) db[n] = true;
         go (i + 1);
       }
     }
@@ -253,7 +285,8 @@ function saveInDB (sub) {
   });
 }
 
-
-function afterComplete (cnt, tot) {
-  console.log('Downloaded ', cnt, 'of', tot, 'submissions');
+function afterComplete () {
+  for (var i = 0; i < failed.length; ++i) console.log(failed[i]);
+  console.log();
+  console.log('Downloaded ', cnt, 'of', total, 'submissions');
 }
