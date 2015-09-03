@@ -55,89 +55,99 @@ if (!fs.existsSync(directory)) {
 }
 
 
-setTimeout(function() {console.log('Waiting for response of Codeforces ...')}, 1000);
+setTimeout(function() {console.log('Download contest names ...')}, 1000);
 
-request.get(url, function (err, res, body) {
-  if (err) console.log('Error to get ' + url, err);
-  else {
-    var data = JSON.parse(body);
-    if (data.status == 'OK') {
-      var data = data.result;
+request.get(url2, function (err, res, body) {
+  var data = body = JSON.parse(body);
+  if (data.status == 'OK') {
 
-      for (var i = 0; i < data.length; ++i) {
-        var cur = data[i];
-        if (cur.verdict == 'OK') {
-          var contestId = cur.contestId;
-          var index = cur.problem.index;
-          var lang = cur.programmingLanguage;
-          var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
-          var ext = getExtension(lang);
-          var isGym = false;
+    processContestNames (data.result, function(err) {
+      if (!err) {
 
-          if (contestId > maxContestId) {
-            urlProblemStat = 'http://codeforces.com/gym/' + contestId + '/problem/' + index;
-            isGym = true;
+        console.log('Download submissions ids ...');
+        request.get(url, function (err, res, body) {
+          if (err) console.log('Error to get ' + url, err);
+          else {
+            var data = JSON.parse(body);
+            if (data.status == 'OK') {
+              var data = data.result;
+
+              for (var i = 0; i < data.length; ++i) {
+                var cur = data[i];
+                if (cur.verdict == 'OK') {
+                  var contestId = cur.contestId;
+                  var index = cur.problem.index;
+                  var lang = cur.programmingLanguage;
+                  var urlProblemStat = 'http://codeforces.com/contest/' + contestId + '/problem/' + index;
+                  var ext = getExtension(lang);
+                  var isGym = false;
+
+                  if (contestId > maxContestId) {
+                    urlProblemStat = 'http://codeforces.com/gym/' + contestId + '/problem/' + index;
+                    isGym = true;
+                  }
+
+                  if (!db[cur.id]) {
+                    var sub = { subId: cur.id, contestId: contestId, index: index,
+                      lang: lang, urlProblemStat: urlProblemStat, ext: ext, isGym: isGym }
+
+                      getSourceCode(sub);
+                  }
+                }
+              }
+            }
+            else {
+              console.log('API error ' + url, data.status);
+            }
           }
 
-          if (!db[res.id]) {
-            accepted.push( {subId: cur.id, contestId: contestId, index: index,
-                        lang: lang, urlProblemStat: urlProblemStat, ext: ext, isGym: isGym} );
-          }
-        }
+        });
       }
-    }
-    else {
-      console.log('API error ' + url, data.status);
-    }
+    });
   }
-
-  request.get(url2, function (err, res, body) {
-    var data = body = JSON.parse(body);
-    if (data.status == 'OK') {
-      for (var i = 0; i < data.length; ++i) {
-        var name = data[i].result.contest.name;
-        var id = data[i].result.contest.id;
-        contestMap[id] = name;
-      }
-    }
-    else {
-      console.log('API Error ' + url, data.status);
-    }
-
-    process.nextTick(function(){ getSourceCode(0) });
-    console.log(accepted.length);
-  });
+  else {
+    console.log('API Error ' + url, data.status);
+  }
 
 });
 
-
-function getSourceCode (i) {
-    if (i > 10) return 0;
+function processContestNames (data, callback) {
+  function go (i) {
+    if (i >= data.length) {
+      console.log('listoProcessContest')
+      callback(null);
+    }
     else {
-//  for (var i = 0; i < accepted.length; ++i) {
-    if (!accepted[i].isGym) {
-      var contestId = accepted[i].contestId;
-      var subId = accepted[i].subId;
-      var url = 'http://codeforces.com/contest/' + contestId + '/submission/' + subId;
-      console.log(url);
-      request.get(url, function (err, res, body) {
-        try {
-          var $ = cheerio.load(body);
-          var sourceCode = $('.program-source')[0].children[0].data;
-          writeFile(accepted[i], sourceCode)
-        }
-        catch (err) {
-          console.log('Error on getSource: ', err);
-        }
-      });
+      var name = data[i].name;
+      var id = data[i].id;
+      contestMap[id] = name;
+      go (i + 1);
     }
-//  }
-    getSourceCode(i + 1);
-    }
+  }
+  go (0);
+}
+
+
+function getSourceCode (sub) {
+  if (!sub.isGym) {
+    var contestId = sub.contestId;
+    var subId = sub.subId;
+    var url = 'http://codeforces.com/contest/' + contestId + '/submission/' + subId;
+
+    request.get(url, function (err, res, body) {
+      try {
+        var $ = cheerio.load(body);
+        var sourceCode = $('.program-source')[0].children[0].data;
+        writeFile(sub, sourceCode)
+      }
+      catch (err) {
+        console.log('Error on getSource: ', err);
+      }
+    });
+  }
 }
 
 function writeFile (sub, sourceCode) {
-  console.log(sub.contestId)
   sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
   var comm = getComment(sub.lang);
   if (comm) sourceCode = comm + ' ' + sub.urlProblemStat + '\n\n' + sourceCode;
