@@ -10,7 +10,7 @@ var inf = 10000000;
 var maxContestId = 100000;
 var cnt = 0;
 var handle;
-var count;
+var count = inf;
 var contestMap = {};
 var dbPath = './data.db';
 var directory = '.';
@@ -28,9 +28,7 @@ process.argv.forEach(function (v, i, arr) {
   if (v == '-h') handle = arr[i + 1];
   if (v == '-c') {
     var val = arr[i + 1];
-    count = val;
-    if (isNaN(val)) count = inf;
-    else if (Number(val) <= 0) count = inf;
+    if (!isNaN(val) && val > 0) count = val;
   }
   if (v == '-d') {
     var val = arr[i + 1];
@@ -68,9 +66,6 @@ request.get(url2, function (err, res, body) {
     processContestNames (data.result, function (err) {
       if (!err) {
         var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=' + count;
-        console.log(handle)
-        console.log(count)
-        console.log(directory)
 
         console.log('Downloading submissions ids ...');
         request.get(url, function (err, res, body) {
