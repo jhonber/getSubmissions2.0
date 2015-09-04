@@ -17,10 +17,12 @@ var db = {};
 var directory = './codes';
 var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=' + count;
 var extension = {'GNU C++': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
-  'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js'};
+  'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js',
+  'Ada': 'adb'};
 
 var comment = {'GNU C++': '//','GNU C': '//' ,'Java': '//', 'Haskell': '--',
-  'Pascal': '//', 'Perl': '#', 'PHP': '//', 'Python': '#', 'Ruby': '#', 'JavaScript': '//'};
+  'Pascal': '//', 'Perl': '#', 'PHP': '//', 'Python': '#', 'Ruby': '#', 'JavaScript': '//',
+  'Ada': '--'};
 
 
 
