@@ -19,5 +19,15 @@
     "mkdirp": "^0.5.1",
     "progress": "^1.1.8",
     "request": "^2.61.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhonber/getSubmissions2.0"
+  },
+  "bugs": {
+    "url": "https://github.com/jhonber/getSubmissions2.0/issues"
+  },
+  "bin": {
+    "get-submissions": "./bin/getSubmissions.js"
   }
 }
