@@ -3,12 +3,12 @@ App to get the source code of your submissions with verdict ```Accepted``` from 
 
 ## To install
 ```
-$ npm install
+# npm install -g get-submissions
 ```
 
 ## To use
 ```
-$ node index.js -h <handle> -c <count> -d <directory>
+$ get-submissions -h <handle> -c <count> -d <directory>
 
 <handle>: Valid handle from codeforces.com
 <count>:  Searching for Accepted in the last N submissions, "infinite" by default
@@ -16,13 +16,13 @@ $ node index.js -h <handle> -c <count> -d <directory>
 
 Examples:
   // Gets all Accepted submissions and saves it in './' (current directory)
-  - node index.js -h tourist
-  
+  - get-submissions -h tourist
+
   // Gets all Accepted submissions from the last 20 submissions and saves it in './'
-  - node index.js -h tourist -c 20
-  
+  - get-submissions -h tourist -c 20
+
   // Gets all Accepted submissions and saves it in './codeforces' folder.
-  - node index.js -h tourist -d codeforces
+  - get-submissions -h tourist -d codeforces
 ```
 
 This could be take a while (depending of the amount of submissions).
