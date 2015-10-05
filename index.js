@@ -5,15 +5,11 @@ var mkdirp  = require('mkdirp');
 var async   = require('async');
 var progBar = require('progress');
 
-var inf = 10000000;
 var maxContestId = 100000;
 var cnt = total = 0;
-var handle;
-var count = inf;
 var failed = [];
 var contestMap = {};
 var dbPath = './data.db';
-var directory = '.';
 var url2 = 'http://codeforces.com/api/contest.list';
 var extension = {'GNU C++': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
   'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js',
@@ -26,94 +22,62 @@ var comment = {'GNU C++': '//','GNU C': '//' ,'Java': '//', 'Haskell': '--',
 
 
 
-process.argv.forEach(function (v, i, arr) {
-  if (v == '-h') handle = arr[i + 1];
-  if (v == '-c') {
-    var val = arr[i + 1];
-    if (!isNaN(val) && val > 0) count = val;
-  }
-  if (v == '-d') {
-    var val = arr[i + 1];
-    if (val) directory = val;
-    var s = directory.length - 1;
-    if (directory[s] == '/') directory = directory.substr(0,s);
-  }
-});
+function getSubmissions(handle, count, directory) {
+  request.get(url2, function (err, res, body) {
+    var data = body = JSON.parse(body);
+    if (data.status == 'OK') {
+      processContestNames (data.result, function (err) {
+        if (!err) {
+          var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=' + count;
 
+          console.log('Downloading submissions ids ...');
+          request.get(url, function (err, res, body) {
+            if (err) console.log('Error to get ' + url, err);
+            else {
+              var data = JSON.parse(body);
+              if (data.status == 'OK') {
+                var data = data.result;
 
-if (!handle) {
-  var pname = process.argv[1].split('/');
-  pname = pname[pname.length - 1];
-  console.log('\nUsage: ' + process.argv[0] + ' ' + pname + ' <handle> <count>\n');
-  console.log('<handle>: Valid handle from codeforces.com');
-  console.log('<count>: Searching for Accepted in the last N submissions, "infinite" by default\n');
-  process.exit(1);
-}
+                loadDB(function (err, db) {
 
+                  selectSubToDownload (db, data, function (err, res) {
+                    var tot = res.length;
+                    total = tot;
+                    var bar = new progBar('  downloading [:bar] :percent :etas', {
+                      complete: '#',
+                      incomplete: '.',
+                      width: 20,
+                      total: tot
+                    });
 
-if (directory != '.') {
-  mkdirp(directory, function (err) {
-    if (err) console.error(err)
-  });
-}
+                    console.log('Total accepted: ', tot);
+                    if (err) console.log(err);
 
-
-setTimeout(function() {console.log('Downloading contest names ...')}, 1000);
-
-request.get(url2, function (err, res, body) {
-  var data = body = JSON.parse(body);
-  if (data.status == 'OK') {
-    processContestNames (data.result, function (err) {
-      if (!err) {
-        var url = 'http://codeforces.com/api/user.status?handle=' + handle + '&from=1&count=' + count;
-
-        console.log('Downloading submissions ids ...');
-        request.get(url, function (err, res, body) {
-          if (err) console.log('Error to get ' + url, err);
-          else {
-            var data = JSON.parse(body);
-            if (data.status == 'OK') {
-              var data = data.result;
-
-              loadDB(function (err, db) {
-
-                selectSubToDownload (db, data, function (err, res) {
-                  var tot = res.length;
-                  total = tot;
-                  var bar = new progBar('  downloading [:bar] :percent :etas', {
-                    complete: '#',
-                    incomplete: '.',
-                    width: 20,
-                    total: tot
-                  });
-
-                  console.log('Total accepted: ', tot);
-                  if (err) console.log(err);
-
-                  console.log('Downloading source codes ...');
-                  async.each(res, function (cur, callback) {
-                    getSourceCode(cur, function (err) {
-                      cnt ++;
-                      bar.tick();
-                      if (bar.complete) afterComplete();
-                      callback();
+                    console.log('Downloading source codes ...');
+                    async.each(res, function (cur, callback) {
+                      getSourceCode(cur, directory, function (err) {
+                        cnt ++;
+                        bar.tick();
+                        if (bar.complete) afterComplete();
+                        callback();
+                      });
                     });
                   });
                 });
-              });
+              }
+              else console.log('API error ' + url, data.status);
             }
-            else console.log('API error ' + url, data.status);
-          }
 
-        });
-      }
-    });
-  }
-  else {
-    console.log('API Error ' + url, data.status);
-  }
+          });
+        }
+      });
+    }
+    else {
+      console.log('API Error ' + url, data.status);
+    }
 
-});
+  });
+}
 
 
 function selectSubToDownload (db, data, callback) {
@@ -164,7 +128,7 @@ function processContestNames (data, callback) {
 }
 
 
-function getSourceCode (sub, callback) {
+function getSourceCode (sub, directory, callback) {
   if (!sub.isGym) {
     var contestId = sub.contestId;
     var subId = sub.subId;
@@ -174,7 +138,7 @@ function getSourceCode (sub, callback) {
       try {
         var $ = cheerio.load(body);
         var sourceCode = $('.program-source')[0].children[0].data;
-        writeFile(sub, sourceCode, function (err) {
+        writeFile(sub, sourceCode, directory, function (err) {
           callback(null);
         });
       }
@@ -192,7 +156,7 @@ function getSourceCode (sub, callback) {
 }
 
 
-function writeFile (sub, sourceCode, callback) {
+function writeFile (sub, sourceCode, directory, callback) {
   sourceCode = sourceCode.replace(/(\r\n|\n|\r)/gm, '\n');
   var comm = getComment(sub.lang);
   if (comm) sourceCode = comm + ' ' + sub.urlProblemStat + '\n\n' + sourceCode;
@@ -291,4 +255,15 @@ function afterComplete () {
   for (var i = 0; i < failed.length; ++i) console.log(failed[i]);
   console.log();
   console.log('Downloaded ', cnt, 'of', total, 'submissions');
+}
+
+
+module.exports = function(handle, count, directory) {
+  if (directory != '.') {
+    mkdirp(dir, function (err) {
+      if (err) console.error(err)
+    });
+  }
+
+  getSubmissions(handle, count, directory);
 }
