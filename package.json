@@ -1,5 +1,5 @@
 {
-  "name": "getSubmissions",
+  "name": "get-submissions",
   "version": "2.0.0",
   "description": "Get submissions from Codeforces",
   "main": "index.js",
