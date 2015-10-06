@@ -152,6 +152,8 @@ function getSourceCode (sub, directory, callback) {
   else {
     var s = 'This submission belongs to gym contest:\n' + sub.urlProblemStat + '\n';
     failed.push(s);
+    cnt --;
+    callback(null);
   }
 }
 
@@ -253,8 +255,7 @@ function saveInDB (sub) {
 
 function afterComplete () {
   for (var i = 0; i < failed.length; ++i) console.log(failed[i]);
-  console.log();
-  console.log('Downloaded ', cnt, 'of', total, 'submissions');
+  console.log('\nDownloaded ', cnt, 'of', total, 'submissions');
 }
 
 
