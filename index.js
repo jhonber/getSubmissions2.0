@@ -13,7 +13,7 @@ var dbPath = './data.db';
 var url2 = 'http://codeforces.com/api/contest.list';
 var extension = {'GNU C++': 'cpp', 'GNU C': 'c' ,'Java': 'java', 'Haskell': 'hs',
   'Pascal':'p', 'Perl': 'pl', 'PHP': 'php', 'Python': 'py', 'Ruby': 'rb', 'JavaScript': 'js',
-  'Ada': 'adb':, 'Kotlin': 'kt'};
+  'Ada': 'adb', 'Kotlin': 'kt'};
 
 var comment = {'GNU C++': '//','GNU C': '//' ,'Java': '//', 'Haskell': '--',
   'Pascal': '//', 'Perl': '#', 'PHP': '//', 'Python': '#', 'Ruby': '#', 'JavaScript': '//',
