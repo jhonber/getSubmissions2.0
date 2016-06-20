@@ -1,6 +1,6 @@
 {
   "name": "get-submissions",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "Get submissions from Codeforces",
   "main": "index.js",
   "scripts": {
