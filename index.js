@@ -197,22 +197,12 @@ function writeFile (sub, sourceCode, directory, callback) {
 
 
 function getExtension (lang) {
-  for (var key in extension) {
-    if (extension.hasOwnProperty(key) && typeof lang.indexOf &&
-        lang.indexOf(key) != -1) {
-      return extension[key];
-    }
-  }
+  return extension[lang];
 }
 
 
 function getComment (lang) {
-  for (var key in comment) {
-    if (comment.hasOwnProperty(key) && typeof lang.indexOf &&
-        lang.indexOf(key) != -1) {
-      return comment[key];
-    }
-  }
+  return comment[lang];
 }
 
 
