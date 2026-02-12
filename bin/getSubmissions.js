@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+var fs = require('fs');
 var getSubmissions = require('../index.js');
 var inf = 10000000;
 var handle;
@@ -32,9 +33,7 @@ if (!handle) {
 
 
 if (directory != '.') {
-  mkdirp(directory, function (err) {
-    if (err) console.error(err)
-  });
+  fs.mkdirSync(directory, { recursive: true });
 }
 
 

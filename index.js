@@ -1,7 +1,6 @@
 var request = require('request');
 var cheerio = require('cheerio');
 var fs      = require('fs');
-var mkdirp  = require('mkdirp');
 var async   = require('async');
 var progBar = require('progress');
 
@@ -137,7 +136,7 @@ function getSourceCode (sub, directory, callback) {
     request.get(url, function (err, res, body) {
       try {
         var $ = cheerio.load(body);
-        var sourceCode = $('.program-source')[0].children[0].data;
+        var sourceCode = $('.program-source').first().text();
         writeFile(sub, sourceCode, directory, function (err) {
           callback(null);
         });
@@ -170,29 +169,14 @@ function writeFile (sub, sourceCode, directory, callback) {
   var contestDir = directory + '/' + contestMap[sub.contestId];
   var path = contestDir + '/' + name;
 
-  if (!fs.existsSync(contestDir)) {
-    mkdirp(contestDir, function (err) {
-      if (err) console.error(err)
-        else {
-          fs.writeFile(path, sourceCode, function (err) {
-            if (err) throw err;
-            else {
-              saveInDB(sub.subId);
-              callback(null);
-            }
-          });
-        }
-    });
-  }
-  else {
-    fs.writeFile(path, sourceCode, function (err) {
-      if (err) throw err;
-      else {
-        saveInDB(sub.subId);
-        callback(null);
-      }
-    });
-  }
+  fs.mkdirSync(contestDir, { recursive: true });
+  fs.writeFile(path, sourceCode, function (err) {
+    if (err) throw err;
+    else {
+      saveInDB(sub.subId);
+      callback(null);
+    }
+  });
 }
 
 
@@ -251,9 +235,7 @@ function afterComplete () {
 
 module.exports = function(handle, count, directory) {
   if (directory != '.') {
-    mkdirp(dir, function (err) {
-      if (err) console.error(err)
-    });
+    fs.mkdirSync(directory, { recursive: true });
   }
 
   getSubmissions(handle, count, directory);
